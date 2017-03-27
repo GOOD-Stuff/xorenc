@@ -21,34 +21,35 @@ static char *path_key;
 static char *path_text;
 static char *path_encr;
 
+/*************** PROTOTYPES ****************/
 static const QString get_keys(ifstream &file);
 static const QString get_text(ifstream &file);
 static const QString get_encr_text(const QString key,
                                    const QString clear_text);
 static void clear_space(QString &text);
-
 static int menu(int argc, char **argv);
-static QString get_encr(ifstream &file);
+/******************************************/
 
 int main(int argc, char *argv[]){    
     cout << "\tNice to meet you! Let\'s start!" << endl;
 
     path_key = (char*)calloc(MAX_INPUT, sizeof(char*));
     path_text = (char*)calloc(MAX_INPUT, sizeof(char*));
+    path_encr = (char*)calloc(MAX_INPUT, sizeof(char*));
 
     // Get path to files
     if( menu(argc, argv) != 0 )
         return -FAILURE;
 
     ifstream key_file(path_key);
-    if( !key_file.is_open()){
+    if( !key_file.is_open() ){
         fprintf(stderr, "Can't open file with"
                         " options: %s\r\n", strerror(errno));
         return -FAILURE;
     }
 
     ifstream plain_file(path_text);
-    if( !plain_file.is_open()){
+    if( !plain_file.is_open() ){
         fprintf(stderr, "Can't open file with"
                         " options: %s\r\n", strerror(errno));
         return -FAILURE;
@@ -56,13 +57,34 @@ int main(int argc, char *argv[]){
 
     const QString key_str = get_keys(key_file);
     const QString plain_str = get_text(plain_file);
-    bool flag;
-    printf("%x | %x\n", key_str.at(0), plain_str.at(0));
+    const QString encr_str = get_encr_text(key_str, plain_str);
 
-    printf("%x | %s\n", key_str.toStdWString().at(0) ^ plain_str.toStdWString().at(0),
-           key_str.toStdWString().at(0) ^ plain_str.toStdWString().at(0));
-    //printf("%x | %s\n", key_str.toUInt( ^ plain_str.at(0),
-      //                  key_str.at(0) ^ plain_str.at(0));
+    cout << "Your key:\t\t" << key_str.toStdString() << endl;
+    cout << "Your plain text:\t" << plain_str.toStdString() << endl;
+    cout << "Your encr text:\t\t" << encr_str.toStdString() << endl;
+
+    if( path_encr[0] == NULL )
+        strcpy(path_encr, "encr.txt");
+    ofstream encr_file(path_encr, ios_base::out | ios_base::trunc);
+    if( !encr_file.is_open() ){
+        fprintf(stderr, "Can't open file with"
+                        " options: %s\r\n", strerror(errno));
+        key_file.close();
+        plain_file.close();
+
+        return -FAILURE;
+
+    }
+
+    encr_file.write(encr_str.toUtf8(), encr_str.toUtf8().length());
+
+    key_file.close();
+    plain_file.close();
+    encr_file.close();
+
+    free(path_key);
+    free(path_text);
+    free(path_encr);
 
     return SUCCESS;
 }
@@ -78,19 +100,16 @@ static int menu(int argc, char **argv){
     string help = "\tYou must to use:\n"
                   "-k\t- file which contains key;\n"
                   "-t\t- file which contains plain text;\n"
+                  "-e\t- file where will be contains encrypted text;\n"
                   "-h\t- this help view;\n";
-    if( ( argc != 5 ) ){
-        if( !strcmp(argv[1], "-h") ){
-            cout << help << endl;
-            return -FAILURE;
-        }
+    if( ( argc < 5 ) || ( argc > 7 ) ){
         cout << "\tYou doing something wrong!" << endl;
         cout << help << endl;
         return -FAILURE;
     }
 
     int opt;
-    while( (opt = getopt(argc, argv, "k:t:h:")) != -1 ){
+    while( (opt = getopt(argc, argv, "k:t:e:h:")) != -1 ){
         switch(opt){
         case 'k':
             cout << "\tYour key file will be: ";
@@ -98,9 +117,14 @@ static int menu(int argc, char **argv){
             cout << path_key << endl;
             break;
         case 't':
-            cout << "\tYour encrypted file will be: ";
+            cout << "\tYour plaintext file will be: ";
             strcpy(path_text, optarg);
             cout << path_text << endl;
+            break;
+        case 'e':
+            cout << "\tYour encrypted file will be: ";
+            strcpy(path_encr, optarg);
+            cout << path_encr << endl;
             break;
         case 'h':
             cout << help << endl;
@@ -195,10 +219,20 @@ static const QString get_text(ifstream &file){
  */
 static const QString get_encr_text(const QString key, const QString clear_text){
     QString encr_text;
+    uint16_t hex_key;
+    uint16_t hex_pln;
+    uint16_t hex_enc;
 
-    for( auto iter_text = clear_text.begin(); iter_text != clear_text.end();
-        iter_text++ ){
-        //encr_text.push_back();
+    for( auto iter_text = clear_text.begin(), iter_key = key.begin();
+            iter_text != clear_text.end();
+                iter_text++, iter_key++ ){
+        if( iter_key == key.end())
+            iter_key = key.begin();
+        hex_key = iter_key->unicode();
+        hex_pln = iter_text->unicode();
+        hex_enc = hex_key ^ hex_pln;
+
+        encr_text.push_back(hex_enc);
     }
 
 /*
