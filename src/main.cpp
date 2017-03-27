@@ -19,14 +19,20 @@
 using namespace std;
 static char *path_key;
 static char *path_text;
+static char *path_alph;
 static char *path_encr;
+static int alph_length = 33;
+static bool isNumb = false;
 
 /*************** PROTOTYPES ****************/
 static const QString get_keys(ifstream &file);
 static const QString get_text(ifstream &file);
-static const QString get_encr_text(const QString key,
+static const QString get_alph(ifstream &file);
+
+static const QString get_encr_text(const QString key, const QString alph,
                                    const QString clear_text);
 static void clear_space(QString &text);
+static void clear_enters(QString &text);
 static int menu(int argc, char **argv);
 /******************************************/
 
@@ -35,6 +41,7 @@ int main(int argc, char *argv[]){
 
     path_key = (char*)calloc(MAX_INPUT, sizeof(char*));
     path_text = (char*)calloc(MAX_INPUT, sizeof(char*));
+    path_alph = (char*)calloc(MAX_INPUT, sizeof(char*));
     path_encr = (char*)calloc(MAX_INPUT, sizeof(char*));
 
     // Get path to files
@@ -51,14 +58,23 @@ int main(int argc, char *argv[]){
     ifstream plain_file(path_text);
     if( !plain_file.is_open() ){
         fprintf(stderr, "Can't open file with"
-                        " options: %s\r\n", strerror(errno));
+                        " plaintext: %s\r\n", strerror(errno));
+        return -FAILURE;
+    }
+
+    ifstream alph_file(path_alph);
+    if( !alph_file.is_open() ){
+        fprintf(stderr, "Can't open file with"
+                        " alphabet: %s\r\n", strerror(errno));
         return -FAILURE;
     }
 
     const QString key_str = get_keys(key_file);
     const QString plain_str = get_text(plain_file);
-    const QString encr_str = get_encr_text(key_str, plain_str);
+    const QString alph_str = get_alph(alph_file);
+    const QString encr_str = get_encr_text(key_str, alph_str, plain_str);
 
+    cout << "Your alph:\t\t" << alph_str.toStdString() << endl;
     cout << "Your key:\t\t" << key_str.toStdString() << endl;
     cout << "Your plain text:\t" << plain_str.toStdString() << endl;
     cout << "Your encr text:\t\t" << encr_str.toStdString() << endl;
@@ -80,10 +96,12 @@ int main(int argc, char *argv[]){
 
     key_file.close();
     plain_file.close();
+    alph_file.close();
     encr_file.close();
 
     free(path_key);
     free(path_text);
+    free(path_alph);
     free(path_encr);
 
     return SUCCESS;
@@ -100,16 +118,17 @@ static int menu(int argc, char **argv){
     string help = "\tYou must to use:\n"
                   "-k\t- file which contains key;\n"
                   "-t\t- file which contains plain text;\n"
+                  "-a\t- file which contains alphabet;\n"
                   "-e\t- file where will be contains encrypted text;\n"
                   "-h\t- this help view;\n";
-    if( ( argc < 5 ) || ( argc > 7 ) ){
+    if( ( argc < 6 ) || ( argc > 8 ) ){
         cout << "\tYou doing something wrong!" << endl;
         cout << help << endl;
         return -FAILURE;
     }
 
     int opt;
-    while( (opt = getopt(argc, argv, "k:t:e:h:")) != -1 ){
+    while( (opt = getopt(argc, argv, "k:t:e:a:h:")) != -1 ){
         switch(opt){
         case 'k':
             cout << "\tYour key file will be: ";
@@ -120,6 +139,11 @@ static int menu(int argc, char **argv){
             cout << "\tYour plaintext file will be: ";
             strcpy(path_text, optarg);
             cout << path_text << endl;
+            break;
+        case 'a':
+            cout << "\tYour alphabet file will be: ";
+            strcpy(path_alph, optarg);
+            cout << path_alph << endl;
             break;
         case 'e':
             cout << "\tYour encrypted file will be: ";
@@ -167,7 +191,22 @@ static const QString get_keys(ifstream &file){
     }
 
     QString s_key_words(key_words);
-    clear_space(s_key_words);
+    clear_enters(s_key_words);
+    QRegExp regul("\\d+");
+    if( s_key_words.contains(regul))
+            isNumb = true;
+
+    if( isNumb ){ // if we work with digits, we must can work with n-digit elements
+        QString s_key_numbs;
+        for(int i = 0, pos = 0; i < s_key_words.length(); i++){
+            if( s_key_words.at(i).isNumber() ){
+
+            }
+            else if( s_key_words.at(i).isSpace() ){
+                s_key_numbs.push_back(s_key_words.at(i));
+            }
+        }
+    }
 
     free(key_words);
 
@@ -203,10 +242,49 @@ static const QString get_text(ifstream &file){
     }
 
     QString s_text(text);
-    clear_space(s_text);
+    clear_enters(s_text);
 
     free(text);
     return s_text;
+}
+
+/**
+ * @brief get_alph     - return the string of alphabet for encryption;
+ * @param file         - file which contains alphabet;
+ * @return s_alph_line - if all was successfully, string of alphabet;
+ *         NULL        - if was error;
+ */
+static const QString get_alph(ifstream &file){
+    struct stat info_file;
+    stat(path_alph, &info_file);
+
+    if( info_file.st_size <= 0 ){   // Check the size of file
+        printf("Why your %s is empty? (^o^)\r\n", path_alph);
+        return NULL;
+    }
+
+    file.seekg(0, ios_base::beg); // Set position into start of file
+    alph_length = info_file.st_size;
+
+    char *alph_line = (char*) calloc(alph_length, sizeof(char*));
+    if( alph_line == NULL ){
+        printf("Couldn't allocate memory for alphabet. Sorry (X_X)\r\n");
+        return NULL;
+    }
+
+    file.read(alph_line, alph_length);
+    if( !file ){
+        printf("Couldn't read file with alphabet. Sorry (*-*)\r\n");
+        return NULL;
+    }
+
+    QString s_alph_line(alph_line);
+    clear_enters(s_alph_line);
+
+    alph_length = s_alph_line.size();
+
+    free(alph_line);
+    return s_alph_line;
 }
 
 /**
@@ -217,22 +295,60 @@ static const QString get_text(ifstream &file){
  * @return encr_text    - if all was successfully, string of encrypted text;
  *         NULL         - if was error;
  */
-static const QString get_encr_text(const QString key, const QString clear_text){
+static const QString get_encr_text(const QString key, const QString alph,
+                                   const QString clear_text){
     QString encr_text;
     uint16_t hex_key;
     uint16_t hex_pln;
     uint16_t hex_enc;
-
+    int incr_alph, incr_key, incr_text;
+    int pos = 0;
     for( auto iter_text = clear_text.begin(), iter_key = key.begin();
             iter_text != clear_text.end();
                 iter_text++, iter_key++ ){
         if( iter_key == key.end())
             iter_key = key.begin();
+
+        incr_alph = alph.indexOf(*iter_text);
+        if( incr_alph < 0 ){
+            encr_text.append(*iter_text);
+            iter_key--;
+            continue;
+        }
+
+        if( isNumb == false ){
+            incr_key = alph.indexOf(*iter_key);
+            if( incr_key < 0 ){
+                iter_text--;
+                continue;
+            }
+            incr_key++;
+        }
+        else{
+            if( iter_key->isNumber() ){
+                char zhest = iter_key->toLatin1();
+                incr_key = atoi(&zhest);
+            }
+            else{
+                iter_text--;
+                continue;
+            }
+        }
+        incr_alph++;
+
+        incr_text = incr_alph ^ incr_key;
+
+        incr_text--;
+
+        encr_text.append(alph.at(incr_text));
+
+        /*
         hex_key = iter_key->unicode();
         hex_pln = iter_text->unicode();
         hex_enc = hex_key ^ hex_pln;
 
         encr_text.push_back(hex_enc);
+        */
     }
 
 /*
@@ -283,4 +399,18 @@ static void clear_space(QString &text){
        if( pos != -1 )
            text.remove(pos, 1);
    }
+}
+
+/**
+ * @brief clear_enters - Clear string only from \n symbols;
+ * @param text         - String of text (key, alphabet, plain text);
+ */
+static void clear_enters(QString &text){
+    text = text.toLower();
+    int pos = 0;
+    while( text.contains('\n') ) {
+        pos = text.indexOf('\n');
+        if( pos != -1 )
+            text.remove(pos, 1);
+    }
 }
