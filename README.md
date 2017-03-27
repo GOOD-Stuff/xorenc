@@ -3,7 +3,7 @@ Encryption using XOR.
 
 This project is a laboratory work on the subject "Information Security".
 
-#HOWTO
+# HOWTO
 
 First of all you must to create a files with plain text and key's text. To get the encrypted text, you need to run the following command: ./xor -k keys.txt -t text.txt -e encrypt.txt
 
