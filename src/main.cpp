@@ -7,6 +7,7 @@
 #include <fstream>
 #include <QDebug>
 #include <unistd.h>
+#include <vector>
 #include <algorithm>
 #include <qalgorithms.h>
 #include <string>
@@ -22,7 +23,8 @@ static char *path_text;
 static char *path_alph;
 static char *path_encr;
 static int alph_length = 33;
-static bool isNumb = false;
+static bool isKeyNumb = false;
+static bool isTxtNumb = false;
 
 /*************** PROTOTYPES ****************/
 static const QString get_keys(ifstream &file);
@@ -31,7 +33,6 @@ static const QString get_alph(ifstream &file);
 
 static const QString get_encr_text(const QString key, const QString alph,
                                    const QString clear_text);
-static void clear_space(QString &text);
 static void clear_enters(QString &text);
 static int menu(int argc, char **argv);
 /******************************************/
@@ -79,7 +80,7 @@ int main(int argc, char *argv[]){
     cout << "Your plain text:\t" << plain_str.toStdString() << endl;
     cout << "Your encr text:\t\t" << encr_str.toStdString() << endl;
 
-    if( path_encr[0] == NULL )
+    if( path_encr[0] == (char)NULL )
         strcpy(path_encr, "encr.txt");
     ofstream encr_file(path_encr, ios_base::out | ios_base::trunc);
     if( !encr_file.is_open() ){
@@ -190,23 +191,10 @@ static const QString get_keys(ifstream &file){
         return NULL;
     }
 
-    QString s_key_words(key_words);
-    clear_enters(s_key_words);
+    QString s_key_words(key_words);  
     QRegExp regul("\\d+");
-    if( s_key_words.contains(regul))
-            isNumb = true;
-
-    if( isNumb ){ // if we work with digits, we must can work with n-digit elements
-        QString s_key_numbs;
-        for(int i = 0, pos = 0; i < s_key_words.length(); i++){
-            if( s_key_words.at(i).isNumber() ){
-
-            }
-            else if( s_key_words.at(i).isSpace() ){
-                s_key_numbs.push_back(s_key_words.at(i));
-            }
-        }
-    }
+    if( s_key_words.contains(regul) )
+        isKeyNumb = true;
 
     free(key_words);
 
@@ -241,8 +229,10 @@ static const QString get_text(ifstream &file){
         return NULL;
     }
 
-    QString s_text(text);
-    clear_enters(s_text);
+    QString s_text(text);  
+    QRegExp regul("\\d+");
+    if( s_text.contains(regul) )
+        isTxtNumb = true;
 
     free(text);
     return s_text;
@@ -298,108 +288,61 @@ static const QString get_alph(ifstream &file){
 static const QString get_encr_text(const QString key, const QString alph,
                                    const QString clear_text){
     QString encr_text;
-    uint16_t hex_key;
-    uint16_t hex_pln;
-    uint16_t hex_enc;
-    int incr_alph, incr_key, incr_text;
-    int pos = 0;
+
+    int indx_alph, indx_key, incr_text;
     for( auto iter_text = clear_text.begin(), iter_key = key.begin();
-            iter_text != clear_text.end();
-                iter_text++, iter_key++ ){
+                                            iter_text != clear_text.end();
+                                                    iter_text++, iter_key++ ){
+
         if( iter_key == key.end())
             iter_key = key.begin();
 
-        incr_alph = alph.indexOf(*iter_text);
-        if( incr_alph < 0 ){
-            encr_text.append(*iter_text);
-            iter_key--;
-            continue;
+        // If string contains numbers, then work only with numbers
+        //if( isTxtNumb == false ){
+            indx_alph = alph.indexOf(*iter_text);
+            if( indx_alph < 0 ){
+                encr_text.append(*iter_text);
+                iter_key--;
+                continue;
+            }
+            indx_alph++;
+        /* }
+        else{
+            QString tmp_str;
+            while( !iter_text->isSpace() && iter_text->isNumber() ){
+                tmp_str.append(*iter_text++);
+            }
+            indx_alph = atoi(tmp_str.toStdString().c_str());
         }
-
-        if( isNumb == false ){
-            incr_key = alph.indexOf(*iter_key);
-            if( incr_key < 0 ){
+*/
+        if( isKeyNumb == false ){
+            indx_key = alph.indexOf(*iter_key);
+            if( indx_key < 0 ){
                 iter_text--;
                 continue;
             }
-            incr_key++;
+            indx_key++;
         }
         else{
-            if( iter_key->isNumber() ){
-                char zhest = iter_key->toLatin1();
-                incr_key = atoi(&zhest);
+            QString tmp_str;
+            while( !iter_key->isSpace() && iter_key->isNumber() ){
+                tmp_str.append(*iter_key++);
             }
-            else{
-                iter_text--;
-                continue;
-            }
-        }
-        incr_alph++;
+            indx_key = atoi(tmp_str.toStdString().c_str());
+        }        
 
-        incr_text = incr_alph ^ incr_key;
+        incr_text = indx_alph ^ indx_key;
 
-        incr_text--;
+        if( incr_text > 0 )
+            incr_text--;
 
         encr_text.append(alph.at(incr_text));
-
-        /*
-        hex_key = iter_key->unicode();
-        hex_pln = iter_text->unicode();
-        hex_enc = hex_key ^ hex_pln;
-
-        encr_text.push_back(hex_enc);
-        */
     }
 
-/*
-    int incr_alph, incr_key, incr_text;
-    int pos = 0;
-    QString::const_iterator iter_key = key.begin();
-    for( QString::const_iterator iter_txt = clear_text.begin(); iter_txt != clear_text.end();
-                                       iter_txt++, iter_key++, pos++ ) {
-        if( iter_key == key.end() )
-            iter_key = key.begin();
-
-        incr_alph = colm_alph.indexOf(*iter_txt);
-        if( incr_alph < 0 ){
-            encr_text.append(*iter_txt);
-            iter_key--;
-            continue;
-        }
-
-kek:
-        incr_key = colm_alph.indexOf(*iter_key);
-        if( incr_key < 0 ){
-            iter_key++;
-            if( iter_key == key.end() )
-                iter_key = key.begin();
-            goto kek;
-        }
-
-        incr_text = incr_alph + incr_key;
-
-        if( incr_text >= alph_length )
-            incr_text = abs(incr_text - alph_length);
-
-        encr_text.append(colm_alph.at(incr_text));
-    }
-*/
     return encr_text;
 }
 
 
-static void clear_space(QString &text){
-   text = text.toLower();
-   int pos = 0;
-   while( text.contains(' ') || text.contains('\n') ) {
-       pos = text.indexOf(' ');
-       if( pos != -1 )
-           text.remove(pos, 1);
-       pos = text.indexOf('\n');
-       if( pos != -1 )
-           text.remove(pos, 1);
-   }
-}
 
 /**
  * @brief clear_enters - Clear string only from \n symbols;
