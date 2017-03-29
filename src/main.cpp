@@ -31,11 +31,74 @@ static const QString get_keys(ifstream &file);
 static const QString get_text(ifstream &file);
 static const QString get_alph(ifstream &file);
 
-static const QString get_encr_text(const QString key, const QString alph,
+static const QString get_encr_text(const QString alph, const QString key,
                                    const QString clear_text);
 static void clear_enters(QString &text);
 static int menu(int argc, char **argv);
 /******************************************/
+
+
+const QString get_plai_text(const QString alph, const QString key,
+                                   const QString clear_text){
+    QString plain_text;
+
+    int indx_alph, indx_key, incr_text;
+    for( auto iter_text = clear_text.begin(), iter_key = key.begin();
+                                            iter_text != clear_text.end();
+                                                    iter_text++, iter_key++ ){
+
+        if( iter_key == key.end())
+            iter_key = key.begin();
+
+        // If string contains numbers, then work only with numbers
+        //if( isTxtNumb == false ){
+            indx_alph = alph.indexOf(*iter_text);
+            if( indx_alph < 0 ){
+                plain_text.append(*iter_text);
+                iter_key--;
+                continue;
+            }
+            indx_alph++;
+        /* }
+        else{
+            QString tmp_str;
+            while( !iter_text->isSpace() && iter_text->isNumber() ){
+                tmp_str.append(*iter_text++);
+            }
+            indx_alph = atoi(tmp_str.toStdString().c_str());
+        }
+*/
+        if( isKeyNumb == false ){
+            indx_key = alph.indexOf(*iter_key);
+            if( indx_key < 0 ){
+                iter_text--;
+                continue;
+            }
+            indx_key++;
+        }
+        else{
+            QString tmp_str;
+            while( !iter_key->isSpace() && iter_key->isNumber() ){
+                tmp_str.append(*iter_key++);
+            }
+            indx_key = atoi(tmp_str.toStdString().c_str());
+        }
+
+        incr_text = indx_alph ^ indx_key;
+
+        if( incr_text > 0 )
+            incr_text--;
+
+        if( incr_text > alph_length )
+            incr_text = incr_text % alph_length;
+
+        plain_text.append(alph.at(incr_text));
+    }
+
+    return plain_text;
+
+}
+
 
 int main(int argc, char *argv[]){    
     cout << "\tNice to meet you! Let\'s start!" << endl;
@@ -44,6 +107,7 @@ int main(int argc, char *argv[]){
     path_text = (char*)calloc(MAX_INPUT, sizeof(char*));
     path_alph = (char*)calloc(MAX_INPUT, sizeof(char*));
     path_encr = (char*)calloc(MAX_INPUT, sizeof(char*));
+
 
     // Get path to files
     if( menu(argc, argv) != 0 )
@@ -73,12 +137,14 @@ int main(int argc, char *argv[]){
     const QString key_str = get_keys(key_file);
     const QString plain_str = get_text(plain_file);
     const QString alph_str = get_alph(alph_file);
-    const QString encr_str = get_encr_text(key_str, alph_str, plain_str);
+    const QString encr_str = get_encr_text(alph_str, key_str, plain_str);
+    const QString denc_str = get_plai_text(alph_str, key_str, encr_str);
 
     cout << "Your alph:\t\t" << alph_str.toStdString() << endl;
     cout << "Your key:\t\t" << key_str.toStdString() << endl;
     cout << "Your plain text:\t" << plain_str.toStdString() << endl;
     cout << "Your encr text:\t\t" << encr_str.toStdString() << endl;
+    cout << "Your decr text:\t\t" << denc_str.toStdString() << endl;
 
     if( path_encr[0] == (char)NULL )
         strcpy(path_encr, "encr.txt");
@@ -285,7 +351,7 @@ static const QString get_alph(ifstream &file){
  * @return encr_text    - if all was successfully, string of encrypted text;
  *         NULL         - if was error;
  */
-static const QString get_encr_text(const QString key, const QString alph,
+static const QString get_encr_text(const QString alph, const QString key,
                                    const QString clear_text){
     QString encr_text;
 
@@ -335,6 +401,9 @@ static const QString get_encr_text(const QString key, const QString alph,
 
         if( incr_text > 0 )
             incr_text--;
+
+        if( incr_text > alph_length )
+            incr_text = incr_text % alph_length;
 
         encr_text.append(alph.at(incr_text));
     }
